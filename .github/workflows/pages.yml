@@ -1,7 +1,7 @@
 name: leaderboard
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "2-57/5 * * * *"
   workflow_dispatch:
   push:
     branches: [main]
