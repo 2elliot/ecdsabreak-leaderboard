@@ -1,0 +1,4 @@
+site/
+standings.json
+status-cache.json
+__pycache__/
