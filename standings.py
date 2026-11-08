@@ -23,7 +23,7 @@ def utc(text):
 
 
 WINDOW_OPEN = utc("2026-11-07T17:00:00")
-WINDOW_CLOSE = utc("2026-11-14T17:00:00")
+WINDOW_CLOSE = utc("2026-11-13T07:59:00")
 EARLY_EXACT_OPEN = utc("2026-11-06T08:00:00")
 PREFIX = "comp-"
 BASELINE_USERS = ("operator-check",)
