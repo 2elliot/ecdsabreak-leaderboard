@@ -5,6 +5,7 @@ import html
 import json
 import os
 import re
+import shutil
 import sys
 
 REPO = "https://github.com/jtaroreh/ecdsafail-v2-reference"
@@ -38,6 +39,13 @@ a:hover{text-decoration:underline}
 .sub,.note,.when{color:var(--muted)}
 .sub{margin-bottom:24px}
 .note{font-size:13px;margin-top:10px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:24px}
+.top .sub{margin-bottom:0}
+.brand{flex-shrink:0}
+.brand img{height:36px;width:auto;display:block;filter:brightness(0);opacity:0.9}
+a.brand{text-decoration:none}
+a.brand:hover{opacity:0.7}
+@media (prefers-color-scheme:dark){.brand img{filter:none;opacity:0.95}}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .label{color:var(--muted);font-size:13px}
@@ -129,8 +137,13 @@ def page(data, now):
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="300"><title>Circuit competition</title><style>{STYLE}</style></head><body><main>
+<div class="top">
+<div>
 <h1>Circuit competition</h1>
 <p class="sub">{html.escape(state)}. Closes {CLOSE_WORDS}. Updated <time class="when" data-age datetime="{stamp}">{stamp}</time>.</p>
+</div>
+<a href="https://qcb.berkeley.edu" class="brand" aria-label="Quantum Computing at Berkeley"><img src="logo.png" alt="Quantum Computing at Berkeley"></a>
+</div>
 <div class="cards">{award_card("Holding Lowest T", holder(ranked, line, "lowered_t"), "lowered_t")}{award_card("Holding Lowest qubit-time", holder(ranked, line, "qubit_time"), "qubit_time")}</div>
 <p class="note">Nothing is final until the audit after the close, which can drop an entry.</p>
 <h2>Line to beat</h2>
@@ -146,7 +159,12 @@ def page(data, now):
 def main(source, target):
     with open(source) as f:
         data = json.load(f)
-    os.makedirs(os.path.dirname(target), exist_ok=True)
+    target_dir = os.path.dirname(target)
+    if target_dir:
+        os.makedirs(target_dir, exist_ok=True)
+    repo_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
+    if os.path.exists(repo_logo):
+        shutil.copy2(repo_logo, os.path.join(target_dir or ".", "logo.png"))
     with open(target, "w") as f:
         f.write(page(data, datetime.datetime.now(datetime.timezone.utc)))
 

@@ -39,7 +39,8 @@ assert build.holder([row(trade_off)], LINE, "lowered_t") is None, "nothing holds
 
 planted = entry("<script>x</script>", "<img src=x onerror=alert(1)>", 5, "eval-d", 50, 900)
 text = build.page(data([row(planted)], [{"entry": planted, "reason": "SAME_COST"}]), NOW)
-assert "<script>x" not in text and "<img" not in text, "board text is escaped"
+assert "<script>x" not in text and "<img src=x" not in text, "board text is escaped"
+assert "logo.png" in text, "the header displays the logo"
 
 linked = entry("jack", "comp-iwnlcern-pr2-0927a5b09823", 5, "eval-e", 50, 900)
 assert "ecdsafail-v2-reference/pull/2" in build.page(data([row(linked)]), NOW), "an entry links its pull request"
