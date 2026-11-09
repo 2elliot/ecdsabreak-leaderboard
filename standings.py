@@ -141,6 +141,12 @@ def dominates(a, b):
     return a != b and a[0] <= b[0] and a[1] <= b[1]
 
 
+def beats(entry, reference):
+    """The awards' test: lower than the reference on one raw cost and no higher on the other."""
+    (t, q), (ref_t, ref_q) = costs(entry), costs(reference)
+    return (t < ref_t and q <= ref_q) or (q < ref_q and t <= ref_t)
+
+
 def layers(pairs):
     """Each distinct pair is 1 plus the highest layer among its dominators, so equal pairs share a layer. Sorted order puts every dominator first. This is `layers_by_definition` from the tests of `pareto_layers` in service/src/consumer.rs."""
     held = {}
@@ -187,6 +193,35 @@ def refusal(entry, rules, slots):
 
 def board_order(entry):
     return entry.round_id, entry.evaluation
+
+
+def reference_of(baseline):
+    """The baseline row an entry must beat: the lowest qubit-time, then the earliest in board order."""
+    return min((row.entry for row in baseline), key=lambda entry: (entry.qubit_time, board_order(entry)), default=None)
+
+
+def ranked_by(cost, other):
+    """The one ranking key every branch, award, and audit list uses: the lower `cost`, then on a tie the lower `other` cost, and only on an exact tie the earlier in board order."""
+    return lambda entry: (cost(entry), other(entry), board_order(entry))
+
+
+def lowered_t(entry):
+    return entry.lowered_t
+
+
+def qubit_time(entry):
+    return entry.qubit_time
+
+
+BY_T = ranked_by(lowered_t, qubit_time)
+BY_QUBIT_TIME = ranked_by(qubit_time, lowered_t)
+
+
+def award_holder(rows, reference, key):
+    """The row that holds an award as things stand: the first by `key` among the rows that beat the reference, so a tie in the award's cost goes to the lower other cost."""
+    if reference is None:
+        return None
+    return min((row for row in rows if beats(row.entry, reference)), key=lambda row: key(row.entry), default=None)
 
 
 def on_the_table(entry, rules):
@@ -272,8 +307,8 @@ def best_per_member(ordered, top, per_member):
 
 
 def audit_picks(ranked, top=AUDIT_TOP, per_member=AUDIT_PER_MEMBER):
-    by_t = sorted(ranked, key=lambda row: (row.entry.lowered_t, row.entry.evaluation))
-    by_qubit_time = sorted(ranked, key=lambda row: (row.entry.qubit_time, row.entry.evaluation))
+    by_t = sorted(ranked, key=lambda row: BY_T(row.entry))
+    by_qubit_time = sorted(ranked, key=lambda row: BY_QUBIT_TIME(row.entry))
     picks = best_per_member(by_t, top, per_member) + best_per_member(by_qubit_time, top, per_member)
     return list({p.entry.evaluation: p for p in picks}.values())
 
