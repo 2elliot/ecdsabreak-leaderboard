@@ -30,9 +30,9 @@ assert not build.beats(entry("a", "m", 3, "e", 50, 1100), LINE), "a higher cost 
 assert not build.beats(entry("a", "m", 3, "e", 100, 1000), LINE), "equal on both doesn't beat"
 
 first, later = entry("a", "m1", 3, "eval-b", 50, 900), entry("b", "m2", 4, "eval-a", 50, 800)
-assert build.holder([row(later), row(first)], LINE, "lowered_t") is first, "a tie goes to the earlier round"
-same = entry("c", "m3", 3, "eval-a", 50, 950)
-assert build.holder([row(first), row(same)], LINE, "lowered_t") is same, "in one round, the lower evaluation id"
+assert build.holder([row(first), row(later)], LINE, "lowered_t") is later, "a tie goes to the lower other cost"
+same = entry("c", "m3", 3, "eval-a", 50, 900)
+assert build.holder([row(first), row(same)], LINE, "lowered_t") is same, "on an exact tie, the earlier in board order"
 trade_off = entry("d", "m4", 5, "eval-c", 10, 1100)
 assert build.holder([row(trade_off), row(first)], LINE, "lowered_t") is first, "a trade-off can't hold an award"
 assert build.holder([row(trade_off)], LINE, "lowered_t") is None, "nothing holds with no entry beating the reference"
@@ -45,6 +45,11 @@ assert "logo.png" in text, "the header displays the logo"
 linked = entry("jack", "comp-iwnlcern-pr2-0927a5b09823", 5, "eval-e", 50, 900)
 assert "ecdsafail-v2-reference/pull/2" in build.page(data([row(linked)]), NOW), "an entry links its pull request"
 assert "/pull/" not in build.entry_cell(entry("x", "comp-a-pr2-notahexhead", 5, "e", 1, 1)), "only the bot's name form links"
+
+text = build.page(data([row(entry("p", "slow-t", 3, "e1", 90, 100)), row(entry("q", "fast-t", 3, "e2", 10, 990))]), NOW)
+by_t, by_qubit_time = text.split("By qubit-time</h3>")
+assert by_t.index("fast-t") < by_t.index("slow-t"), "the T table puts the lowest T first"
+assert by_qubit_time.index("slow-t") < by_qubit_time.index("fast-t"), "the qubit-time table puts the lowest qubit-time first"
 
 empty = build.page(data(unranked=[{"entry": LINE, "reason": "BASELINE_FAILED"}]), NOW)
 assert "No ranked entries yet" in empty and "Nobody yet" in empty, "an empty board renders"

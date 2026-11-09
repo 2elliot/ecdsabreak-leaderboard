@@ -46,6 +46,9 @@ a:hover{text-decoration:underline}
 a.brand{text-decoration:none}
 a.brand:hover{opacity:0.7}
 @media (prefers-color-scheme:dark){.brand img{filter:none;opacity:0.95}}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:12px;align-items:start}
+.split th,.split td{padding:9px 7px}
+.split h3{font-size:13px;font-weight:500;color:var(--muted);margin:0 0 6px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .label{color:var(--muted);font-size:13px}
@@ -76,10 +79,17 @@ def beats(entry, line):
     return t <= line["lowered_t"] and qubit_time <= line["qubit_time"] and (t < line["lowered_t"] or qubit_time < line["qubit_time"])
 
 
+OTHER = {"lowered_t": "qubit_time", "qubit_time": "lowered_t"}
+
+
+def ranking(cost):
+    """standings.py's `ranked_by`: the lower `cost`, then the lower other cost, then the earlier in board order."""
+    return lambda e: (e[cost], e[OTHER[cost]], e["round_id"], e["evaluation"])
+
+
 def holder(ranked, line, cost):
-    """The entry holding an award today: lowest cost among entries that beat the reference, and on a tie the earliest in board order."""
-    rows = [row["entry"] for row in ranked if beats(row["entry"], line)]
-    return min(rows, key=lambda e: (e[cost], e["round_id"], e["evaluation"]), default=None)
+    """The entry holding an award today: first by `ranking(cost)` among entries that beat the reference."""
+    return min((row["entry"] for row in ranked if beats(row["entry"], line)), key=ranking(cost), default=None)
 
 
 def percent(value, line):
@@ -100,20 +110,18 @@ def award_card(title, entry, cost):
     return f'<div class="card"><p class="label">{title}</p>{body}</div>'
 
 
-def ranked_table(ranked, line):
+def ranked_table(ranked, line, cost, title):
     if not ranked:
-        return '<div class="scroll"><p class="empty">No ranked entries yet.</p></div>'
+        return f'<div><h3>{title}</h3><div class="scroll"><p class="empty">No ranked entries yet.</p></div></div>'
     rows = []
-    for row in ranked:
-        e = row["entry"]
+    for place, e in enumerate(sorted((row["entry"] for row in ranked), key=ranking(cost)), 1):
         rows.append(
-            f'<tr><td class="num">{row["layer"]}</td><td>{html.escape(e["user"])}</td><td>{entry_cell(e)}</td>'
-            f'<td class="num">{number(e["lowered_t"])}</td><td class="num">{percent(e["lowered_t"], line["lowered_t"])}</td>'
-            f'<td class="num">{number(e["qubit_time"])}</td><td class="num">{percent(e["qubit_time"], line["qubit_time"])}</td>'
+            f'<tr><td class="num">{place}</td><td>{html.escape(e["user"])}</td><td>{entry_cell(e)}</td>'
+            f'<td class="num">{number(e[cost])}</td><td class="num">{percent(e[cost], line[cost])}</td>'
             f'<td>{"<span class=yes>Yes</span>" if beats(e, line) else "No"}</td></tr>'
         )
-    head = '<tr><th class="num">Layer</th><th>Member</th><th>Entry</th><th class="num">T</th><th class="num">vs ref</th><th class="num">Qubit-time</th><th class="num">vs ref</th><th>Beats ref</th></tr>'
-    return f'<div class="scroll"><table><thead>{head}</thead><tbody>{"".join(rows)}</tbody></table></div>'
+    head = f'<tr><th class="num">#</th><th>Member</th><th>Entry</th><th class="num">{title.removeprefix("By ")}</th><th class="num">vs ref</th><th>Beats ref</th></tr>'
+    return f'<div><h3>{title}</h3><div class="scroll"><table><thead>{head}</thead><tbody>{"".join(rows)}</tbody></table></div></div>'
 
 
 def unranked_section(unranked):
@@ -131,7 +139,7 @@ def unranked_section(unranked):
 
 def page(data, now):
     line = data["baseline"][0]["entry"]
-    ranked = sorted(data["ranked"], key=lambda r: (r["layer"], r["entry"]["qubit_time"], r["entry"]["round_id"], r["entry"]["evaluation"]))
+    ranked = data["ranked"]
     state = {"before": "Not open yet", "open": "Open", "closed": "Closed"}.get(data["phase"], data["phase"])
     stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     return f"""<!doctype html>
@@ -149,7 +157,7 @@ def page(data, now):
 <h2>Line to beat</h2>
 <p class="num">The reference: T {number(line["lowered_t"])}, qubit-time {number(line["qubit_time"])}. To beat it, an entry must be lower on one cost and no higher on the other.</p>
 <h2>Standings</h2>
-{ranked_table(ranked, line)}
+<div class="split">{ranked_table(ranked, line, "lowered_t", "By T")}{ranked_table(ranked, line, "qubit_time", "By qubit-time")}</div>
 {unranked_section(data["unranked"])}
 <p class="note">Sampled and unqualified: one controlled addition, not an attack. Read from <a href="{html.escape(data["url"])}/v2/tested">the public board</a> by <a href="https://github.com/jtaroreh/ecdsabreak-leaderboard/blob/main/standings.py">standings.py</a>. Notes aren't checked here, so the operator's final table decides. Enter at <a href="{REPO}">the reference repository</a>.</p>
 </main><script>{AGE_SCRIPT}</script></body></html>
