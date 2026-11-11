@@ -10,7 +10,7 @@ import shutil
 import sys
 
 REPO = "https://github.com/jtaroreh/ecdsafail-v2-reference"
-CLOSE_WORDS = "Thursday 2026-11-12, 11:59 PM PST"
+CLOSE = datetime.datetime(2026, 11, 12, 23, 59, tzinfo=datetime.timezone(datetime.timedelta(hours=-8), "PST"))
 ENTRY_NAME = re.compile(r"comp-[A-Za-z0-9-]+-pr(\d+)-[0-9a-f]{12}")
 REASONS = {
     "CANCELLED": "round cancelled",
@@ -48,7 +48,7 @@ a:hover{text-decoration:underline}
 a.brand{text-decoration:none}
 a.brand:hover{opacity:0.7}
 @media (prefers-color-scheme:dark){.brand img{filter:none;opacity:0.95}}
-.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:12px;align-items:start}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:12px;align-items:start}
 .split th,.split td{padding:9px 7px}
 .split h3{font-size:13px;font-weight:500;color:var(--muted);margin:0 0 6px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
@@ -61,7 +61,7 @@ table{border-collapse:collapse;width:100%;white-space:nowrap}
 th,td{padding:9px 10px;text-align:left;border-top:1px solid var(--line)}
 thead th{border-top:0;color:var(--muted);font-size:13px;font-weight:500}
 td.num,th.num{text-align:right}
-.yes{color:var(--good);font-weight:600}
+tr.behind td{color:var(--muted)}
 .empty{padding:14px 16px;color:var(--muted)}
 :root{--frontier:#2457c5;--ref:#c2570c}
 @media (prefers-color-scheme:dark){:root{--frontier:#6690ee;--ref:#cc6f1c}}
@@ -95,6 +95,9 @@ const t=document.querySelector('time[data-age]');
 if(t){const m=Math.round((Date.now()-Date.parse(t.dateTime))/60000);
 t.textContent=m<1?'just now':m<60?m+' min ago':Math.round(m/6)/10+' hours ago';
 if(m>30)t.textContent+=', so this page may be out of date';}
+const left=document.querySelector('[data-close]');
+if(left){const m=Math.ceil((Date.parse(left.dataset.close)-Date.now())/60000);
+left.textContent=m<=0?'':', in '+(m<120?m+' min':m<2880?Math.floor(m/60)+' hours':Math.floor(m/1440)+' days');}
 const chart=document.querySelector('.chart');
 if(chart){const tip=chart.querySelector('.tip'),hide=()=>{tip.hidden=true};
 const show=g=>{tip.replaceChildren();
@@ -137,14 +140,21 @@ def holder(ranked, line, cost):
     return min((row["entry"] for row in ranked if beats(row["entry"], line)), key=ranking(cost), default=None)
 
 
-def percent(value, line):
-    return f"{(value / line - 1) * 100:+.2f}%"
+def percent(value, best):
+    gap = (value / best - 1) * 100
+    return f"{gap:+,.0f}%" if gap >= 100 else f"{gap:+.2f}%"
 
 
 def entry_cell(entry):
     name = html.escape(entry["method"])
     found = ENTRY_NAME.fullmatch(entry["method"])
     return f'<a href="{REPO}/pull/{found.group(1)}">#{found.group(1)}</a>' if found else name
+
+
+def day_cell(pst_day):
+    """standings.py's Pacific-time day for the entry, the day its daily limit counts it on."""
+    day = datetime.date.fromisoformat(pst_day)
+    return f'<time datetime="{pst_day}">{day:%b} {day.day}</time>'
 
 
 def award_card(title, entry, cost):
@@ -158,14 +168,16 @@ def award_card(title, entry, cost):
 def ranked_table(ranked, line, cost, title):
     if not ranked:
         return f'<div><h3>{title}</h3><div class="scroll"><p class="empty">No ranked entries yet.</p></div></div>'
+    ordered = sorted(ranked, key=lambda row: ranking(cost)(row["entry"]))
+    best = ordered[0]["entry"][cost]
     rows = []
-    for place, e in enumerate(sorted((row["entry"] for row in ranked), key=ranking(cost)), 1):
+    for place, row in enumerate(ordered, 1):
+        e = row["entry"]
         rows.append(
-            f'<tr><td class="num">{place}</td><td>{html.escape(e["user"])}</td><td>{entry_cell(e)}</td>'
-            f'<td class="num">{number(e[cost])}</td><td class="num">{percent(e[cost], line[cost])}</td>'
-            f'<td>{"<span class=yes>Yes</span>" if beats(e, line) else "No"}</td></tr>'
+            f'<tr{"" if beats(e, line) else " class=behind"}><td class="num">{place}</td><td>{html.escape(e["user"])}</td><td>{entry_cell(e)}</td><td>{day_cell(row["pst_day"])}</td>'
+            f'<td class="num">{number(e[cost])}</td><td class="num">{"—" if place == 1 else percent(e[cost], best)}</td></tr>'
         )
-    head = f'<tr><th class="num">#</th><th>Member</th><th>Entry</th><th class="num">{title.removeprefix("By ")}</th><th class="num">vs ref</th><th>Beats ref</th></tr>'
+    head = f'<tr><th class="num">#</th><th>Member</th><th>Entry</th><th>Date</th><th class="num">{title.removeprefix("By ")}</th><th class="num">vs best</th></tr>'
     return f'<div><h3>{title}</h3><div class="scroll"><table><thead>{head}</thead><tbody>{"".join(rows)}</tbody></table></div></div>'
 
 
@@ -280,7 +292,7 @@ def page(data, now):
 <div class="top">
 <div>
 <h1>Circuit competition</h1>
-<p class="sub">{html.escape(state)}. Closes {CLOSE_WORDS}. Updated <time class="when" data-age datetime="{stamp}">{stamp}</time>.</p>
+<p class="sub">{html.escape(state)}. Closes {CLOSE:%A %Y-%m-%d, %I:%M %p %Z}<span data-close="{CLOSE.isoformat()}"></span>. Updated <time class="when" data-age datetime="{stamp}">{stamp}</time>.</p>
 </div>
 <a href="https://qcb.berkeley.edu" class="brand" aria-label="Quantum Computing at Berkeley"><img src="logo.png" alt="Quantum Computing at Berkeley"></a>
 </div>
@@ -293,6 +305,7 @@ def page(data, now):
 {frontier_chart(ranked, line)}
 <h2>Standings</h2>
 <div class="split">{ranked_table(ranked, line, "lowered_t", "By T")}{ranked_table(ranked, line, "qubit_time", "By qubit-time")}</div>
+{"<p class=note>Grey rows don't beat the reference, so they can't hold an award.</p>" if any(not beats(row["entry"], line) for row in ranked) else ""}
 {unranked_section(data["unranked"])}
 <p class="note">Sampled and unqualified: one controlled addition, not an attack. Read from <a href="{html.escape(data["url"])}/v2/tested">the public board</a> by <a href="https://github.com/jtaroreh/ecdsabreak-leaderboard/blob/main/standings.py">standings.py</a>. Notes aren't checked here, so the operator's final table decides. Enter at <a href="{REPO}">the reference repository</a>.</p>
 </main><script>{AGE_SCRIPT}</script></body></html>

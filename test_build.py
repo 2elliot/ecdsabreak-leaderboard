@@ -16,8 +16,8 @@ def entry(user, method, round_id, evaluation, t, qubit_time):
     return {"user": user, "method": method, "round_id": round_id, "evaluation": evaluation, "lowered_t": t, "qubit_time": qubit_time, "f": 0, "boundary_failing": 0}
 
 
-def row(e, layer=1):
-    return {"entry": e, "layer": layer}
+def row(e, layer=1, day="2026-11-07"):
+    return {"entry": e, "layer": layer, "pst_day": day}
 
 
 def data(ranked=(), unranked=()):
@@ -41,15 +41,33 @@ planted = entry("<script>x</script>", "<img src=x onerror=alert(1)>", 5, "eval-d
 text = build.page(data([row(planted)], [{"entry": planted, "reason": "SAME_COST"}]), NOW)
 assert "<script>x" not in text and "<img src=x" not in text, "board text is escaped"
 assert "logo.png" in text, "the header displays the logo"
+assert "Closes Thursday 2026-11-12, 11:59 PM PST<" in text, "the header gives the close in words"
+assert 'data-close="2026-11-12T23:59:00-08:00"' in text, "the countdown runs to standings.py's close, 2026-11-13T07:59:00 UTC"
 
 linked = entry("jack", "comp-iwnlcern-pr2-0927a5b09823", 5, "eval-e", 50, 900)
 assert "ecdsafail-v2-reference/pull/2" in build.page(data([row(linked)]), NOW), "an entry links its pull request"
 assert "/pull/" not in build.entry_cell(entry("x", "comp-a-pr2-notahexhead", 5, "e", 1, 1)), "only the bot's name form links"
 
-text = build.page(data([row(entry("p", "slow-t", 3, "e1", 90, 100)), row(entry("q", "fast-t", 3, "e2", 10, 990))]), NOW)
+text = build.page(data([row(entry("p", "slow-t", 3, "e1", 90, 100), day="2026-11-07"), row(entry("q", "fast-t", 3, "e2", 10, 990), day="2026-11-10")]), NOW)
 by_t, by_qubit_time = text.split("By qubit-time</h3>")
 assert by_t.index("fast-t") < by_t.index("slow-t"), "the T table puts the lowest T first"
 assert by_qubit_time.index("slow-t") < by_qubit_time.index("fast-t"), "the qubit-time table puts the lowest qubit-time first"
+for table, leader, trailer, gap in ((by_t, "fast-t", "slow-t", "+800%"), (by_qubit_time, "slow-t", "fast-t", "+890%")):
+    rows = table.split("<tr")
+    assert any("slow-t" in r and '"2026-11-07">Nov 7<' in r for r in rows), "each row shows its own entry's day"
+    assert any("fast-t" in r and '"2026-11-10">Nov 10<' in r for r in rows), "each row shows its own entry's day"
+    assert any(leader in r and ">—<" in r for r in rows), "the best row has no gap to show"
+    assert any(trailer in r and f">{gap}<" in r for r in rows), "every other row shows its gap to the best in its table"
+assert "Grey rows" not in text and "class=behind" not in text, "nothing is grey while every entry beats the reference"
+
+loser = entry("r", "loses", 3, "e3", 50, 1100)
+text = build.page(data([row(entry("p", "slow-t", 3, "e1", 90, 100)), row(loser)]), NOW)
+rows = text.split("<tr")
+assert any("loses" in r and r.startswith(" class=behind>") for r in rows), "a row that doesn't beat the reference is grey"
+assert not any("slow-t" in r and "class=behind" in r for r in rows), "a row that beats the reference isn't grey"
+assert "Grey rows" in text, "the page says what grey means"
+assert ">+1,000%<" in text, "a gap of 100% or more rounds to a whole percent, with a thousands separator"
+assert ">+80.00%<" in text, "a gap under 100% keeps two decimals"
 
 empty = build.page(data(unranked=[{"entry": LINE, "reason": "BASELINE_FAILED"}]), NOW)
 assert "No ranked entries yet" in empty and "Nobody yet" in empty, "an empty board renders"
