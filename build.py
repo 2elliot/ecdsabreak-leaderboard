@@ -284,7 +284,12 @@ def frontier_chart(ranked, line):
 def page(data, now):
     line = data["baseline"][0]["entry"]
     ranked = data["ranked"]
-    state = {"before": "Not open yet", "open": "Open", "closed": "Closed"}.get(data["phase"], data["phase"])
+    words = f"{CLOSE:%A %Y-%m-%d, %I:%M %p %Z}"
+    if data["phase"] == "closed":
+        status = f"Closed {words}"
+    else:
+        state = {"before": "Not open yet", "open": "Open"}.get(data["phase"], data["phase"])
+        status = f'{html.escape(state)}. Closes {words}<span data-close="{CLOSE.isoformat()}"></span>'
     stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -292,7 +297,7 @@ def page(data, now):
 <div class="top">
 <div>
 <h1>Circuit competition</h1>
-<p class="sub">{html.escape(state)}. Closes {CLOSE:%A %Y-%m-%d, %I:%M %p %Z}<span data-close="{CLOSE.isoformat()}"></span>. Updated <time class="when" data-age datetime="{stamp}">{stamp}</time>.</p>
+<p class="sub">{status}. Updated <time class="when" data-age datetime="{stamp}">{stamp}</time>.</p>
 </div>
 <a href="https://qcb.berkeley.edu" class="brand" aria-label="Quantum Computing at Berkeley"><img src="logo.png" alt="Quantum Computing at Berkeley"></a>
 </div>

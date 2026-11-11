@@ -43,6 +43,9 @@ assert "<script>x" not in text and "<img src=x" not in text, "board text is esca
 assert "logo.png" in text, "the header displays the logo"
 assert "Closes Thursday 2026-11-12, 11:59 PM PST<" in text, "the header gives the close in words"
 assert 'data-close="2026-11-12T23:59:00-08:00"' in text, "the countdown runs to standings.py's close, 2026-11-13T07:59:00 UTC"
+closed = build.page({**data(), "phase": "closed"}, NOW)
+assert "Closed Thursday 2026-11-12, 11:59 PM PST." in closed and "Closes" not in closed, "after the close, the header says when it closed"
+assert 'data-close="' not in closed, "after the close, nothing counts down"
 
 linked = entry("jack", "comp-iwnlcern-pr2-0927a5b09823", 5, "eval-e", 50, 900)
 assert "ecdsafail-v2-reference/pull/2" in build.page(data([row(linked)]), NOW), "an entry links its pull request"
