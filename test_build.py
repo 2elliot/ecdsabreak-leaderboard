@@ -54,4 +54,15 @@ assert by_qubit_time.index("slow-t") < by_qubit_time.index("fast-t"), "the qubit
 empty = build.page(data(unranked=[{"entry": LINE, "reason": "BASELINE_FAILED"}]), NOW)
 assert "No ranked entries yet" in empty and "Nobody yet" in empty, "an empty board renders"
 assert "Listed, not ranked" not in empty, "the operator's own failed baseline rows stay off the page"
+for low, high, least in ((2.1e7, 5.4e7, 4), (3e9, 2e11, 4), (1e2, 1e9, 4), (0.94e7, 1.06e7, 1)):
+    ticks = build.log_ticks(low, high)
+    assert least <= len(ticks) <= 8 and all(low <= t <= high for t in ticks), f"log ticks fit {low}..{high}: {ticks}"
+
+chart = build.frontier_chart([row(entry("p", "on-front", 3, "e1", 90, 100)), row(entry("q", "behind", 3, "e2", 95, 500), layer=2)], LINE)
+assert chart.count('class="pt front"') == 1 and chart.count('class="pt back"') == 1 and chart.count('class="pt ref"') == 1, "the chart marks the frontier, the rest, and the reference"
+assert 'class="step" d="M' in chart, "the chart draws the frontier"
+twins = build.frontier_chart([row(entry("p", "a", 3, "e1", 90, 100)), row(entry("q", "b", 3, "e2", 90, 100))], LINE)
+assert twins.count('class="pt front"') == 1 and "p · a" in twins and "q · b" in twins, "entries at the same spot share one mark and one tooltip"
+alone = build.frontier_chart([], LINE)
+assert 'class="step"' not in alone and 'class="pt ref"' in alone, "an empty board charts only the reference"
 print("ok")
